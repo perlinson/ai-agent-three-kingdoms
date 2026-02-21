@@ -13,7 +13,7 @@
             color: #eee;
             padding: 20px;
         }
-        .container { max-width: 1200px; margin: 0 auto; }
+        .container { max-width: 1400px; margin: 0 auto; }
         h1 {
             text-align: center;
             font-size: 2.5em;
@@ -24,9 +24,16 @@
         }
         .subtitle { text-align: center; color: #888; margin-bottom: 30px; }
         
+        .turn-display {
+            text-align: center;
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            color: #667eea;
+        }
+        
         .game-area {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-columns: repeat(3, 1fr);
             gap: 20px;
             margin-bottom: 30px;
         }
@@ -40,23 +47,82 @@
         .player-card.shu { border-top: 4px solid #10b981; }
         .player-card.wu { border-top: 4px solid #ef4444; }
         
-        .player-name { font-size: 1.3em; font-weight: bold; margin-bottom: 10px; }
-        .player-icon { font-size: 2em; display: block; margin-bottom: 10px; }
+        .player-header { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
+        .player-icon { font-size: 2em; }
+        .player-name { font-size: 1.3em; font-weight: bold; }
         
-        .stat { display: flex; justify-content: space-between; margin: 8px 0; }
+        .stat { display: flex; justify-content: space-between; margin: 8px 0; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .stat-label { color: #888; }
         .stat-value { font-weight: bold; }
-        
         .gold { color: #fbbf24; }
         .food { color: #34d399; }
         .army { color: #f87171; }
         .wisdom { color: #60a5fa; }
         
+        .cities { margin-top: 15px; }
+        .city { 
+            display: inline-block; 
+            background: rgba(255,255,255,0.1); 
+            padding: 3px 8px; 
+            border-radius: 5px; 
+            margin: 2px;
+            font-size: 0.85em;
+        }
+        
+        .action-panel {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .action-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .tab-btn {
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 8px;
+            color: #eee;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tab-btn:hover, .tab-btn.active { background: #667eea; }
+        
+        .action-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .action-card {
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+        .action-card:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+        }
+        .action-card.disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .action-title { font-weight: bold; margin-bottom: 5px; color: #667eea; }
+        .action-desc { font-size: 0.85em; color: #888; margin-bottom: 8px; }
+        .action-cost { font-size: 0.8em; color: #fbbf24; }
+        
         .log-area {
             background: rgba(0,0,0,0.3);
             border-radius: 10px;
             padding: 20px;
-            max-height: 400px;
+            max-height: 350px;
             overflow-y: auto;
             font-family: monospace;
             font-size: 0.9em;
@@ -66,6 +132,8 @@
         .log-entry.action { color: #aaa; }
         .log-entry.battle { color: #f87171; }
         .log-entry.victory { color: #fbbf24; }
+        .log-entry.diplomacy { color: #a78bfa; }
+        .log-entry.strategy { color: #34d399; }
         
         .btn {
             display: block;
@@ -81,16 +149,20 @@
             transition: transform 0.2s;
         }
         .btn:hover { transform: scale(1.05); }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         
-        .turn-display {
-            text-align: center;
-            font-size: 1.5em;
-            margin: 20px 0;
-            color: #667eea;
+        .relation-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.75em;
+            margin-left: 5px;
         }
+        .relation-hostile { background: #ef4444; }
+        .relation-neutral { background: #6b7280; }
+        .relation-friendly { background: #10b981; }
+        .relation-allied { background: #3b82f6; }
         
-        @media (max-width: 768px) {
+        @media (max-width: 900px) {
             .game-area { grid-template-columns: 1fr; }
         }
     </style>
@@ -100,38 +172,193 @@
         <h1>🏯 三国霸业</h1>
         <p class="subtitle">AI Agent 智能对战模拟</p>
         
-        <div class="turn-display">回合: <span id="turn">0</span> / <span id="maxTurns">30</span></div>
+        <div class="turn-display">
+            回合: <span id="turn">0</span> / <span id="maxTurns">30</span>
+        </div>
         
+        <!-- 玩家区域 -->
         <div class="game-area">
-            <div class="player-card wei" id="wei">
-                <span class="player-icon">🏛️</span>
-                <div class="player-name">魏 - 曹操</div>
+            <!-- 魏 -->
+            <div class="player-card wei">
+                <div class="player-header">
+                    <span class="player-icon">🏛️</span>
+                    <div class="player-name">魏 - 曹操</div>
+                </div>
                 <div class="stat"><span class="stat-label">💰 金币</span><span class="stat-value gold" id="wei-gold">1000</span></div>
                 <div class="stat"><span class="stat-label">🌾 粮草</span><span class="stat-value food" id="wei-food">1000</span></div>
                 <div class="stat"><span class="stat-label">⚔️ 军队</span><span class="stat-value army" id="wei-army">500</span></div>
                 <div class="stat"><span class="stat-label">📖 智慧</span><span class="stat-value wisdom" id="wei-wisdom">80</span></div>
+                <div class="stat"><span class="stat-label">🏰 影响力</span><span class="stat-value" id="wei-influence">50</span></div>
+                <div class="cities" id="wei-cities">
+                    <span class="city">许昌</span>
+                    <span class="city">洛阳</span>
+                    <span class="city">邺城</span>
+                    <span class="city">南阳</span>
+                </div>
+                <div style="margin-top:10px;">
+                    <small>与蜀: <span id="wei-shu-rel" class="relation-badge relation-neutral">中立</span></small><br>
+                    <small>与吴: <span id="wei-wu-rel" class="relation-badge relation-neutral">中立</span></small>
+                </div>
             </div>
             
-            <div class="player-card shu" id="shu">
-                <span class="player-icon">🐉</span>
-                <div class="player-name">蜀 - 刘备</div>
+            <!-- 蜀 -->
+            <div class="player-card shu">
+                <div class="player-header">
+                    <span class="player-icon">🐉</span>
+                    <div class="player-name">蜀 - 刘备</div>
+                </div>
                 <div class="stat"><span class="stat-label">💰 金币</span><span class="stat-value gold" id="shu-gold">1000</span></div>
                 <div class="stat"><span class="stat-label">🌾 粮草</span><span class="stat-value food" id="shu-food">1000</span></div>
                 <div class="stat"><span class="stat-label">⚔️ 军队</span><span class="stat-value army" id="shu-army">500</span></div>
                 <div class="stat"><span class="stat-label">📖 智慧</span><span class="stat-value wisdom" id="shu-wisdom">80</span></div>
+                <div class="stat"><span class="stat-label">🏰 影响力</span><span class="stat-value" id="shu-influence">50</span></div>
+                <div class="cities" id="shu-cities">
+                    <span class="city">成都</span>
+                    <span class="city">汉中</span>
+                    <span class="city">荆州</span>
+                    <span class="city">云南</span>
+                </div>
+                <div style="margin-top:10px;">
+                    <small>与魏: <span id="shu-wei-rel" class="relation-badge relation-neutral">中立</span></small><br>
+                    <small>与吴: <span id="shu-wu-rel" class="relation-badge relation-allied">同盟</span></small>
+                </div>
             </div>
             
-            <div class="player-card wu" id="wu">
-                <span class="player-icon">⚔️</span>
-                <div class="player-name">吴 - 孙权</div>
+            <!-- 吴 -->
+            <div class="player-card wu">
+                <div class="player-header">
+                    <span class="player-icon">⚔️</span>
+                    <div class="player-name">吴 - 孙权</div>
+                </div>
                 <div class="stat"><span class="stat-label">💰 金币</span><span class="stat-value gold" id="wu-gold">1000</span></div>
                 <div class="stat"><span class="stat-label">🌾 粮草</span><span class="stat-value food" id="wu-food">1000</span></div>
                 <div class="stat"><span class="stat-label">⚔️ 军队</span><span class="stat-value army" id="wu-army">500</span></div>
                 <div class="stat"><span class="stat-label">📖 智慧</span><span class="stat-value wisdom" id="wu-wisdom">80</span></div>
+                <div class="stat"><span class="stat-label">🏰 影响力</span><span class="stat-value" id="wu-influence">50</span></div>
+                <div class="cities" id="wu-cities">
+                    <span class="city">建业</span>
+                    <span class="city">武昌</span>
+                    <span class="city">会稽</span>
+                    <span class="city">交州</span>
+                </div>
+                <div style="margin-top:10px;">
+                    <small>与魏: <span id="wu-wei-rel" class="relation-badge relation-neutral">中立</span></small><br>
+                    <small>与蜀: <span id="wu-shu-rel" class="relation-badge relation-allied">同盟</span></small>
+                </div>
             </div>
         </div>
         
-        <button class="btn" id="nextTurn" onclick="nextTurn()">下一回合</button>
+        <!-- 操作面板 -->
+        <div class="action-panel">
+            <h3 style="margin-bottom:15px;">🎮 行动指令 - 当前势力: <span id="current-faction" style="color:#667eea">魏</span></h3>
+            
+            <div class="action-tabs">
+                <button class="tab-btn active" onclick="switchTab('politics')">📜 政治</button>
+                <button class="tab-btn" onclick="switchTab('military')">⚔️ 军事</button>
+                <button class="tab-btn" onclick="switchTab('economy')">💰 经济</button>
+                <button class="tab-btn" onclick="switchTab('diplomacy')">🤝 外交</button>
+            </div>
+            
+            <!-- 政治行动 -->
+            <div id="tab-politics" class="action-grid">
+                <div class="action-card" onclick="doAction('recruit_minister')">
+                    <div class="action-title">📜 招募贤才</div>
+                    <div class="action-desc">招募顶级谋士，提升智慧</div>
+                    <div class="action-cost">💰 200 | 🌾 100</div>
+                </div>
+                <div class="action-card" onclick="doAction('develop_technology')">
+                    <div class="action-title">🔬 发展技术</div>
+                    <div class="action-desc">研发新技术，提升整体实力</div>
+                    <div class="action-cost">💰 300 | 📖 智慧+5</div>
+                </div>
+                <div class="action-card" onclick="doAction('propaganda')">
+                    <div class="action-title">📢 宣传造势</div>
+                    <div class="action-desc">提升民间声望，增加影响力</div>
+                    <div class="action-cost">💰 150 | 影响力+10</div>
+                </div>
+                <div class="action-card" onclick="doAction('establish_trade')">
+                    <div class="action-title">🏪 设立商队</div>
+                    <div class="action-desc">建立贸易网络，获得持续收入</div>
+                    <div class="action-cost">💰 250 | 每回合+30</div>
+                </div>
+            </div>
+            
+            <!-- 军事行动 -->
+            <div id="tab-military" class="action-grid" style="display:none;">
+                <div class="action-card" onclick="doAction('recruit_soldiers')">
+                    <div class="action-title">⚔️ 征兵</div>
+                    <div class="action-desc">招募士兵，扩充军队</div>
+                    <div class="action-cost">💰 100/人 | 🌾 50/人</div>
+                </div>
+                <div class="action-card" onclick="doAction('train_army')">
+                    <div class="action-title">🛡️ 训练军队</div>
+                    <div class="action-desc">提升军队战斗力</div>
+                    <div class="action-cost">💰 200 | 军队战力+10%</div>
+                </div>
+                <div class="action-card" onclick="doAction('fortify_city')">
+                    <div class="action-title">🏰 筑城防御</div>
+                    <div class="action-desc">加固城池，提升防御</div>
+                    <div class="action-cost">💰 300 | 防御+20%</div>
+                </div>
+                <div class="action-card" onclick="doAction('scout_enemy')">
+                    <div class="action-title">👁️ 侦察敌情</div>
+                    <div class="action-desc">探查敌人虚实，制定战略</div>
+                    <div class="action-cost">💰 80 | 了解敌方部署</div>
+                </div>
+            </div>
+            
+            <!-- 经济行动 -->
+            <div id="tab-economy" class="action-grid" style="display:none;">
+                <div class="action-card" onclick="doAction('tax_collection')">
+                    <div class="action-title">💰 征税</div>
+                    <div class="action-desc">向百姓收取税款</div>
+                    <div class="action-cost">⚠️ 民心-5 | 💰 +200</div>
+                </div>
+                <div class="action-card" onclick="doAction('trade_mission')">
+                    <div class="action-title">🛒 商贸使团</div>
+                    <div class="action-desc">派遣商队进行贸易</div>
+                    <div class="action-cost">💰 150 | 💰 +300~500</div>
+                </div>
+                <div class="action-card" onclick="doAction('farming_subsidy')">
+                    <div class="action-title">🌾 农业补贴</div>
+                    <div class="action-desc">鼓励农业生产，增加粮草</div>
+                    <div class="action-cost">💰 100 | 🌾 +300</div>
+                </div>
+                <div class="action-card" onclick="doAction('build_infrastructure')">
+                    <div class="action-title">🏗️ 基础设施</div>
+                    <div class="action-desc">建设道路，提升效率</div>
+                    <div class="action-cost">💰 400 | 全产出+10%</div>
+                </div>
+            </div>
+            
+            <!-- 外交行动 -->
+            <div id="tab-diplomacy" class="action-grid" style="display:none;">
+                <div class="action-card" onclick="doAction('propose_alliance')">
+                    <div class="action-title">🤝 结盟</div>
+                    <div class="action-desc">提议与某势力结盟</div>
+                    <div class="action-cost">💰 300 | 关系大幅提升</div>
+                </div>
+                <div class="action-card" onclick="doAction('send_embassy')">
+                    <div class="action-title">🏛️ 派遣使节</div>
+                    <div class="action-desc">改善双边关系</div>
+                    <div class="action-cost">💰 150 | 关系+10</div>
+                </div>
+                <div class="action-card" onclick="doAction('demand_tribute')">
+                    <div class="action-title">💎 索取贡品</div>
+                    <div class="action-desc">要求对方进贡（可能引发战争）</div>
+                    <div class="action-cost">⚠️ 关系-30 | 💰 +200</div>
+                </div>
+                <div class="action-card" onclick="doAction('declare_war')">
+                    <div class="action-title">⚔️ 宣战</div>
+                    <div class="action-desc">正式发动战争</div>
+                    <div class="action-cost">⚠️ 关系降至敌对</div>
+                </div>
+            </div>
+            
+            <div style="margin-top:20px; text-align:center;">
+                <button class="btn" onclick="nextTurn()" style="width:auto; padding:15px 40px;">⏭️ 结束回合</button>
+            </div>
+        </div>
         
         <div class="log-area" id="log"></div>
     </div>
@@ -141,26 +368,180 @@
         const game = {
             turn: 0,
             maxTurns: 30,
+            currentPlayer: 'wei',
             players: {
-                wei: { name: '魏', leader: '曹操', gold: 1000, food: 1000, army: 500, wisdom: 80, cities: 4 },
-                shu: { name: '蜀', leader: '刘备', gold: 1000, food: 1000, army: 500, wisdom: 80, cities: 4 },
-                wu: { name: '吴', leader: '孙权', gold: 1000, food: 1000, army: 500, wisdom: 80, cities: 4 }
+                wei: { 
+                    name: '魏', leader: '曹操', gold: 1000, food: 1000, army: 500, wisdom: 80, 
+                    influence: 50, cities: ['许昌', '洛阳', '邺城', '南阳'],
+                    defense: 0, attack: 100, income: 50, tech: 1
+                },
+                shu: { 
+                    name: '蜀', leader: '刘备', gold: 1000, food: 1000, army: 500, wisdom: 80, 
+                    influence: 50, cities: ['成都', '汉中', '荆州', '云南'],
+                    defense: 0, attack: 100, income: 50, tech: 1
+                },
+                wu: { 
+                    name: '吴', leader: '孙权', gold: 1000, food: 1000, army: 500, wisdom: 80, 
+                    influence: 50, cities: ['建业', '武昌', '会稽', '交州'],
+                    defense: 0, attack: 100, income: 50, tech: 1
+                }
+            },
+            relations: {
+                'wei-shu': 0, 'wei-wu': 0,
+                'shu-wei': 0, 'shu-wu': 50,
+                'wu-wei': 0, 'wu-shu': 50
             }
         };
         
-        const strategies = {
-            wei: ['aggressive', 'balanced', 'defensive'],
-            shu: ['diplomatic', 'balanced', 'defensive'],
-            wu: ['trading', 'balanced', 'expansionist']
-        };
+        // 行动处理
+        function doAction(action) {
+            const p = game.players[game.currentFaction];
+            let result = '';$
+            let type = 'action';$
+            
+            switch(action) {
+                case 'recruit_minister':
+                    if (p.gold >= 200 && p.food >= 100) {
+                        p.gold -= 200; p.food -= 100;
+                        p.wisdom += Math.floor(Math.random() * 10) + 5;
+                        result = `招募贤才，智慧+${Math.floor(Math.random() * 10) + 5}`;
+                    }
+                    break;
+                case 'develop_technology':
+                    if (p.gold >= 300) {
+                        p.gold -= 300;
+                        p.tech += 0.2;
+                        p.attack += 10;
+                        p.income += 10;
+                        result = `发展技术，科技+0.2，攻击力+10%`;
+                    }
+                    break;
+                case 'propaganda':
+                    if (p.gold >= 150) {
+                        p.gold -= 150;
+                        p.influence += 10;
+                        result = `宣传造势，影响力+10`;
+                    }
+                    break;
+                case 'establish_trade':
+                    if (p.gold >= 250) {
+                        p.gold -= 250;
+                        p.income += 30;
+                        result = `设立商队，每回合+30金币`;
+                    }
+                    break;
+                case 'recruit_soldiers':
+                    const cost = 100, foodCost = 50;
+                    const maxRecruit = Math.min(
+                        Math.floor(p.gold / cost),
+                        Math.floor(p.food / foodCost),
+                        100
+                    );
+                    if (maxRecruit > 0) {
+                        p.gold -= maxRecruit * cost;
+                        p.food -= maxRecruit * foodCost;
+                        p.army += maxRecruit;
+                        result = `征兵${maxRecruit}人，军队现有${p.army}人`;
+                    }
+                    break;
+                case 'train_army':
+                    if (p.gold >= 200) {
+                        p.gold -= 200;
+                        p.attack += 10;
+                        result = `训练军队，攻击力+10%`;
+                    }
+                    break;
+                case 'fortify_city':
+                    if (p.gold >= 300) {
+                        p.gold -= 300;
+                        p.defense += 20;
+                        result = `筑城防御，防御力+20%`;
+                    }
+                    break;
+                case 'scout_enemy':
+                    if (p.gold >= 80) {
+                        p.gold -= 80;
+                        const enemies = ['wei','shu','wu'].filter(f => f !== game.currentFaction);
+                        const target = enemies[Math.floor(Math.random() * enemies.length)];
+                        const ep = game.players[target];
+                        result = `侦察敌情：${ep.name}有${ep.army}军队，${ep.gold}金币`;
+                    }
+                    break;
+                case 'tax_collection':
+                    p.gold += 200;
+                    result = `征税，获得200金币（民心-5）`;
+                    break;
+                case 'trade_mission':
+                    if (p.gold >= 150) {
+                        p.gold -= 150;
+                        const profit = Math.floor(Math.random() * 200) + 300;
+                        p.gold += profit;
+                        result = `商贸使团归来，赚取${profit}金币`;
+                    }
+                    break;
+                case 'farming_subsidy':
+                    if (p.gold >= 100) {
+                        p.gold -= 100;
+                        p.food += 300;
+                        result = `农业补贴，获得300粮草`;
+                    }
+                    break;
+                case 'build_infrastructure':
+                    if (p.gold >= 400) {
+                        p.gold -= 400;
+                        p.income = Math.floor(p.income * 1.1);
+                        result = `基础设施建设完成，全产出+10%`;
+                    }
+                    break;
+                case 'propose_alliance':
+                    if (p.gold >= 300) {
+                        p.gold -= 300;
+                        const targets = {wei:'shu', shu:'wu', wu:'wei'};
+                        const target = targets[game.currentFaction];
+                        game.relations[`${game.currentFaction}-${target}`] = 50;
+                        result = `成功与${game.players[target].name}结盟！`;
+                        type = 'diplomacy';$
+                    }
+                    break;
+                case 'send_embassy':
+                    if (p.gold >= 150) {
+                        p.gold -= 150;
+                        const targets = {wei:'shu', shu:'wu', wu:'wei'};
+                        const target = targets[game.currentFaction];
+                        game.relations[`${game.currentFaction}-${target}`] += 10;
+                        result = `派遣使节，关系改善`;
+                        type = 'diplomacy';$
+                    }
+                    break;
+                case 'demand_tribute':
+                    const dtTargets = {wei:['shu','wu'], shu:['wei','wu'], wu:['wei','shu']};
+                    const dtTarget = dtTargets[game.currentFaction][Math.floor(Math.random() * 2)];
+                    game.relations[`${game.currentFaction}-${dtTarget}`] -= 30;
+                    p.gold += 200;
+                    result = `索取贡品，${game.players[dtTarget].name}被迫贡200进金币（关系恶化 = 'strategy）`;
+                    type';$
+                    break;
+                case 'declare_war':
+                    const dwTargets = {wei:['shu','wu'], shu:['wei','wu'], wu:['wei','shu']};
+                    const dwTarget = dwTargets[game.currentFaction][Math.floor(Math.random() * 2)];
+                    game.relations[`${game.currentFaction}-${dwTarget}`] = -50;
+                    result = `正式向${game.players[dwTarget].name}宣战！`;
+                    type = 'battle';
+                    break;
+            }
+            
+            if (result) {
+                log(`🏛️ ${p.name}: ${result}`, type);
+                updateUI();
+            }
+        }
         
-        const actions = ['trade', 'recruit', 'research', 'diplomacy', 'strategy'];
-        
-        const cities = {
-            wei: ['许昌', '洛阳', '邺城', '南阳'],
-            shu: ['成都', '汉中', '荆州', '云南'],
-            wu: ['建业', '武昌', '会稽', '交州']
-        };
+        function switchTab(tab) {
+            document.querySelectorAll('.action-grid').forEach(el => el.style.display = 'none');
+            document.getElementById(`tab-${tab}`).style.display = 'grid';$
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+        }
         
         function log(msg, type = 'action') {
             const logArea = document.getElementById('log');
@@ -172,7 +553,7 @@
         
         function updateUI() {
             document.getElementById('turn').textContent = game.turn;
-            document.getElementById('maxTurns').textContent = game.maxTurns;
+            document.getElementById('current-faction').textContent = game.players[game.currentFaction].name;
             
             for (const faction of ['wei', 'shu', 'wu']) {
                 const p = game.players[faction];
@@ -180,6 +561,39 @@
                 document.getElementById(`${faction}-food`).textContent = p.food;
                 document.getElementById(`${faction}-army`).textContent = p.army;
                 document.getElementById(`${faction}-wisdom`).textContent = p.wisdom;
+                document.getElementById(`${faction}-Influence`).textContent = p.influence;
+                
+                // 更新城市
+                const cityDiv = document.getElementById(`${faction}-cities`);
+                cityDiv.innerHTML = p.cities.map(c => `<span class="city">${c}</span>`).join('');
+            }
+            
+            // 更新关系
+            updateRelation('wei', 'shu');
+            updateRelation('wei', 'wu');
+            updateRelation('shu', 'wei');
+            updateRelation('shu', 'wu');
+            updateRelation('wu', 'wei');
+            updateRelation('wu', 'shu');
+        }
+        
+        function updateRelation(from, to) {
+            const rel = game.relations[`${from}-${to}`];
+            const el = document.getElementById(`${from}-${to}-rel`);
+            if (!el) return;
+            
+            if (rel >= 50) {
+                el.textContent = '同盟';$
+                el.className = 'relation-badge relation-allied';$
+            } else if (rel >= 10) {
+                el.textContent = '友好';$
+                el.className = 'relation-badge relation-friendly';$
+            } else if (rel <= -50) {
+                el.textContent = '敌对';$
+                el.className = 'relation-badge relation-hostile';$
+            } else {
+                el.textContent = '中立';$
+                el.className = 'relation-badge relation-neutral';$
             }
         }
         
@@ -187,78 +601,51 @@
             game.turn++;
             log(`=== 第 ${game.turn} 回合 ===`, 'turn');
             
+            // 每个势力执行回合
             for (const faction of ['wei', 'shu', 'wu']) {
                 const p = game.players[faction];
                 if (p.army <= 0) continue;
                 
-                // AI决策
-                const strategy = strategies[faction][Math.floor(Math.random() * 3)];
-                const action = actions[Math.floor(Math.random() * actions.length)];
+                // 基础收入
+                p.gold += p.income;
                 
-                // 执行行动
-                let result = '';
-                switch(action) {
-                    case 'trade':
-                        const tradeGain = Math.floor(Math.random() * 100) + 50;
-                        p.gold += tradeGain;
-                        result = `💰 贸易获得 ${tradeGain} 金币`;
-                        break;
-                    case 'recruit':
-                        const recruits = Math.floor(Math.random() * 50) + 20;
-                        if (p.gold >= recruits * 2) {
-                            p.army += recruits;
-                            p.gold -= recruits * 2;
-                            result = `⚔️ 招募 ${recruits} 士兵`;
-                        } else {
-                            result = `💰 金币不足，无法招募`;
-                        }
-                        break;
-                    case 'research':
-                        p.wisdom += Math.floor(Math.random() * 5) + 1;
-                        result = `📖 研究智慧 +${Math.floor(Math.random() * 5) + 1}`;
-                        break;
-                    case 'diplomacy':
-                        const target = ['wei', 'shu', 'wu'].filter(f => f !== faction)[Math.floor(Math.random() * 2)];
-                        result = `🤝 与${game.players[target].name}外交`;
-                        break;
-                    case 'strategy':
-                        const foodGain = Math.floor(Math.random() * 80) + 30;
-                        p.food += foodGain;
-                        result = `🌾 征收粮草 ${foodGain}`;
-                        break;
-                }
-                
-                // 消耗
-                const foodCost = Math.floor(p.army * 0.1);
+                // 粮草消耗
+                const foodCost = Math.floor(p.army * 0.15);
                 p.food -= foodCost;
                 
+                // 检查粮草不足
                 if (p.food < 0) {
                     p.food = 0;
-                    p.army = Math.floor(p.army * 0.8);
-                    result += ` (粮草不足，军队损失!)`;
+                    const lost = Math.floor(p.army * 0.2);
+                    p.army -= lost;
+                    p.wisdom -= 5;
+                    log(`⚠️ ${p.name}粮草不足，损失${lost}士兵！`, 'battle');
                 }
                 
-                log(`🏛️ ${p.name} (${p.leader}): ${result}`);
-                
                 // 随机战斗
-                if (Math.random() < 0.2) {
-                    const target = ['wei', 'shu', 'wu'].filter(f => f !== faction)[Math.floor(Math.random() * 2)];
-                    const targetP = game.players[target];
-                    if (targetP.army > 0) {
-                        const attackPower = p.army * (p.wisdom / 100);
-                        const defensePower = targetP.army * (targetP.wisdom / 100);
+                if (Math.random() < 0.25) {
+                    const targets = ['wei','shu','wu'].filter(f => f !== faction);
+                    const target = targets[Math.floor(Math.random() * targets.length)];
+                    const tp = game.players[target];
+                    
+                    // 检查关系
+                    const rel = game.relations[`${faction}-${target}`];
+                    if (rel < -20 || (rel < 10 && Math.random() < 0.3)) {
+                        // 发起攻击
+                        const attackPower = p.army * (p.attack / 100) * (p.wisdom / 100);
+                        const defensePower = tp.army * (tp.defense / 100) * (tp.wisdom / 100);
                         
                         if (attackPower > defensePower) {
-                            const loot = Math.floor(targetP.gold * 0.2);
+                            const loot = Math.floor(tp.gold * 0.15);
+                            const capturedCity = tp.cities.length > 1 ? tp.cities.pop() : null;
                             p.gold += loot;
-                            targetP.gold -= loot;
-                            targetP.army = Math.floor(targetP.army * 0.7);
-                            result = `⚔️ 击败${targetP.name}，掠夺 ${loot} 金币!`;
-                            log(`🩸 ${p.name} 进攻 ${targetP.name}: 胜利!`, 'battle');
+                            tp.gold -= loot;
+                            tp.army = Math.floor(tp.army * 0.6);
+                            
+                            log(`⚔️ ${p.name}攻克${tp.name}的${capturedCity || '防线'}，掠夺${loot}金币！`, 'battle');
                         } else {
-                            p.army = Math.floor(p.army * 0.8);
-                            result = `⚔️ 进攻${targetP.name}失败!`;
-                            log(`🩸 ${p.name} 进攻 ${targetP.name}: 失败!`, 'battle');
+                            p.army = Math.floor(p.army * 0.7);
+                            log(`⚔️ ${p.name}进攻${tp.name}失败，损失惨重！`, 'battle');
                         }
                     }
                 }
@@ -269,14 +656,16 @@
             // 检查游戏结束
             const alive = Object.values(game.players).filter(p => p.army > 0);
             if (alive.length === 1 || game.turn >= game.maxTurns) {
-                let winner = alive.reduce((a, b) => a.army > b.army ? a : b);
+                let winner = alive.reduce((a, b) => (a.army * a.influence) > (b.army * b.influence) ? a : b);
                 log(`🏆 游戏结束! 胜利者: ${winner.name} (${winner.leader})`, 'victory');
-                document.getElementById('nextTurn').disabled = true;
+                alert(`游戏结束！胜利者: ${winner.name} (${winner.leader})`);
             }
         }
         
         // 初始化
+        game.currentFaction = 'wei';$
         log('🏯 三国霸业开始! 魏蜀吴三国争霸!', 'turn');
+        log('💡 选择行动后点击"结束回合"进行下一回合', 'action');
         updateUI();
     </script>
 </body>
